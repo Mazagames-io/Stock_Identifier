@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Indian Market Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-card: #1E1E1E;
+            --text-primary: #ECEFF1;
+            --text-secondary: #B0BEC5;
+            --border-color: #333333;
+            --accent: #2196F3;
+            --green: #4CAF50;
+            --red: #F44336;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+        body { background-color: var(--bg-dark); color: var(--text-primary); min-height: 100vh; display: flex; flex-direction: column; overflow-x: hidden; }
+
+        /* content wrapper */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+            width: 100%;
+        }
+
+        /* Header */
+        header {
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 32px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .app-title { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; }
+
+        /* Section Styling */
+        section { margin-bottom: 60px; }
+        .section-title { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; color: #fff; border-left: 4px solid var(--accent); padding-left: 12px; }
+        .section-subtitle { color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; margin-left: 16px; }
+
+        /* Search / Analysis Area */
+        .analysis-box {
+            background: var(--bg-card);
+            padding: 32px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            text-align: center;
+        }
+        .search-container { 
+            display: flex; gap: 12px; max-width: 600px; margin: 0 auto; 
+        }
+        input {
+            flex: 1;
+            background: #000;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            color: #fff;
+            border-radius: 6px;
+            font-size: 1.1rem;
+        }
+        input:focus { border-color: var(--accent); outline: none; }
+        button {
+            background: var(--accent);
+            color: #fff; border: none; padding: 0 32px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 1rem;
+        }
+        button:hover { opacity: 0.9; }
+
+        /* Grid */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+
+        .stock-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            cursor: pointer;
+            transition: transform 0.2s, border-color 0.2s;
+        }
+        .stock-card:hover { border-color: var(--accent); transform: translateY(-3px); }
+
+        .card-symbol { display: block; font-weight: 700; font-size: 1rem; color: #fff; }
+        .card-name { display: block; font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .card-price { font-size: 1.2rem; font-weight: 600; color: #fff; margin-top: 8px; display: block;}
+
+        /* Details Overlay */
+        #details {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--bg-dark);
+            z-index: 1000;
+            overflow-y: auto;
+            padding: 40px;
+        }
+        .close-btn { 
+            position: absolute; top: 24px; right: 24px; 
+            background: #333; color: #fff; border: none; 
+            width: 40px; height: 40px; border-radius: 50%; 
+            font-size: 1.5rem; cursor: pointer; 
+        }
+
+        .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; border-bottom: 1px solid var(--border-color); padding-bottom: 24px; }
+        .price-main { font-size: 3rem; font-weight: 300; }
+
+        .signal-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 24px;
+            margin-bottom: 24px;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .badge { padding: 8px 16px; border-radius: 4px; font-weight: 700; color: #fff; font-size: 1.2rem; text-transform: uppercase; }
+        .signal-details { flex: 1; margin-left: 24px; font-size: 1.1rem; line-height: 1.6; }
+
+        .chart-container { height: 500px; background: var(--bg-card); border: 1px solid var(--border-color); padding: 16px; border-radius: 6px; }
+
+        /* Helpers */
+        .hidden { display: none !important; }
+        #analysis-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 2000;
+            display: none; justify-content: center; align-items: center;
+            flex-direction: column;
+        }
+        .loader {
+            width: 48px; height: 48px;
+            border: 4px solid #FFF; border-radius: 50%; display: inline-block; position: relative; box-sizing: border-box; animation: rotation 1s linear infinite;
+        }
+        .loader::after {
+            content: ''; box-sizing: border-box; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: 40px; height: 40px; border-radius: 50%; border: 4px solid transparent; border-bottom-color: var(--accent);
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <div class="app-title">🇮🇳 TradeFlow India</div>
+            <div style="font-size:0.9rem; color:var(--text-secondary)">Live NSE/BSE Tracking</div>
+        </header>
+
+        <!-- 1. Stock Analysis (First) -->
+        <section>
+            <h2 class="section-title">Stock Analysis / Search</h2>
+            <p class="section-subtitle">Deep dive technicals for any Indian stock</p>
+            
+            <div class="analysis-box">
+                <div class="search-container">
+                    <input type="text" id="symbol-input" placeholder="Enter Symbol (e.g. SUZLON, TATASTEEL)">
+                    <button onclick="handleSearch()">ANALYZE</button>
+                </div>
+                <p style="margin-top:16px; color:#666; font-size:0.9rem;">
+                    Default: <b>NSE</b>. For BSE, append <b>.BO</b>
+                </p>
+            </div>
+        </section>
+
+        <!-- 2. Market Overview (Categorized) -->
+        
+        <!-- Penny Stocks -->
+        <section>
+            <h2 class="section-title" style="border-color: #F44336;">Penny & Small Cap Focus</h2>
+            <p class="section-subtitle">High volatility stocks under ₹50-100</p>
+            <div id="grid-penny" class="grid"></div>
+        </section>
+
+        <!-- Mid Cap -->
+        <section>
+            <h2 class="section-title" style="border-color: #FFC107;">Mid Cap Movers</h2>
+            <p class="section-subtitle">Growth oriented companies</p>
+            <div id="grid-mid" class="grid"></div>
+        </section>
+
+        <!-- Large Cap -->
+        <section>
+            <h2 class="section-title" style="border-color: #4CAF50;">Large Cap Giants</h2>
+            <p class="section-subtitle">Stable Nifty 50 market leaders</p>
+            <div id="grid-large" class="grid"></div>
+        </section>
+
+    </div>
+
+    <!-- DETAILS OVERLAY (Full Screen) -->
+    <div id="details" class="hidden">
+        <button class="close-btn" onclick="closeDetails()">×</button>
+
+        <div class="container">
+            <div class="header-row">
+                <div>
+                    <h1 id="detail-symbol" style="font-size:3rem; margin-bottom:0">RELIANCE</h1>
+                    <span style="color:#888; font-size:1.2rem">NSE India</span>
+                </div>
+                <div style="text-align:right">
+                    <div id="detail-price" class="price-main">₹2,450.00</div>
+                    <div style="color:#4CAF50">Live Market Data</div>
+                </div>
+            </div>
+
+            <div class="signal-box">
+                <div id="signal-badge" class="badge">BUY</div>
+                <div id="signal-text" class="signal-details">
+                    Calculating technicals...
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="stockChart"></canvas>
+            </div>
+
+            <div style="margin-top:24px; text-align:center; color:#666; font-size:0.8rem;">
+                DISCLAIMER: Educational use only. Not financial advice.
+            </div>
+        </div>
+    </div>
+
+    <!-- PROCESSING OVERLAY -->
+    <div id="analysis-overlay">
+        <span class="loader"></span>
+        <div style="color:#fff; margin-top:16px; font-weight:600">Fetching Live Data...</div>
+    </div>
+
+    <script>
+        // --- Stock Lists ---
+        const STOCKS_LARGE = [
+            { symbol: 'RELIANCE.NS', name: 'Reliance Ind.' },
+            { symbol: 'TCS.NS', name: 'TCS' },
+            { symbol: 'HDFCBANK.NS', name: 'HDFC Bank' },
+            { symbol: 'INFY.NS', name: 'Infosys' },
+            { symbol: 'ICICIBANK.NS', name: 'ICICI Bank' },
+            { symbol: 'ITC.NS', name: 'ITC Ltd' }
+        ];
+
+        const STOCKS_MID = [
+            { symbol: 'TATACOMM.NS', name: 'Tata Comm' },
+            { symbol: 'ZOMATO.NS', name: 'Zomato' },
+            { symbol: 'ASHOKLEY.NS', name: 'Ashok Leyland' },
+            { symbol: 'FEDERALBNK.NS', name: 'Federal Bank' },
+            { symbol: 'IDFCFIRSTB.NS', name: 'IDFC First' },
+            { symbol: 'BHEL.NS', name: 'BHEL' }
+        ];
+
+        const STOCKS_PENNY = [
+            { symbol: 'SUZLON.NS', name: 'Suzlon Energy' },
+            { symbol: 'IDEA.NS', name: 'Vodafone Idea' },
+            { symbol: 'YESBANK.NS', name: 'Yes Bank' },
+            { symbol: 'JPPOWER.NS', name: 'JP Power' },
+            { symbol: 'RPOWER.NS', name: 'Reliance Power' },
+            { symbol: 'SOUTHBANK.NS', name: 'South Ind Bank' }
+        ];
+
+        let currentChart = null;
+
+        // --- Logic ---
+        function calculateRSI(prices, period = 14) {
+            if (prices.length <= period) return 50;
+            let gains = 0, losses = 0;
+            for (let i = 1; i <= period; i++) {
+                const diff = prices[i - 1] - prices[i];
+                if (diff > 0) losses += diff; else gains += Math.abs(diff);
+            }
+            const rs = (gains / period) / (losses / period);
+            return losses === 0 ? 100 : 100 - (100 / (1 + rs));
+        }
+
+        function calculateSMA(data, period) {
+            if (data.length < period) return 0;
+            return data.slice(0, period).reduce((a, b) => a + b, 0) / period;
+        }
+
+        function generateSignal(prices) {
+            if (!prices || prices.length < 50) return { signal: 'NEUTRAL', color: '#888', reason: 'Insufficient Data' };
+            const price = prices[0];
+            const sma50 = calculateSMA(prices, 50);
+            const rsi = calculateRSI(prices, 14);
+            const stopLoss = (price * 0.95).toFixed(2);
+
+            if (rsi > 70) return { signal: 'SELL', color: '#F44336', reason: `Overbought (RSI ${rsi.toFixed(0)})`, stopLoss };
+            if (price > sma50 && rsi < 45) return { signal: 'BUY', color: '#4CAF50', reason: `Dip in Uptrend (RSI ${rsi.toFixed(0)})`, stopLoss };
+            if (price < sma50) return { signal: 'AVOID', color: '#FF9800', reason: 'Bearish Trend (< 50 SMA)', stopLoss };
+            return { signal: 'HOLD', color: '#2196F3', reason: 'Consolidating', stopLoss };
+        }
+
+        async function fetchStockData(symbol) {
+             const targetUrl = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=6mo&interval=1d`);
+             const url = `https://corsproxy.io/?${targetUrl}`;
+             try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('Network');
+                const json = await res.json();
+                const result = json.chart.result[0];
+                const prices = result.indicators.quote[0].close;
+                const times = result.timestamp;
+                
+                const clean = times.map((t, i) => ({ date: new Date(t*1000), price: prices[i] }))
+                                   .filter(d => d.price).reverse();
+                
+                return { 
+                    price: result.meta.regularMarketPrice.toFixed(2), 
+                    history: clean, 
+                    error: false 
+                };
+             } catch (e) {
+                console.error(symbol, e);
+                return { error: true };
+             }
+        }
+
+        // --- Renderers ---
+        async function loadGrid(stocks, elementId) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '<div style="color:#666">Loading...</div>';
+            
+            // To make it faster, fetch in parallel
+            const promises = stocks.map(async s => {
+                const data = await fetchStockData(s.symbol);
+                return { ...s, data };
+            });
+
+            const results = await Promise.all(promises);
+            container.innerHTML = ''; // Clear loading
+
+            results.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'stock-card';
+                
+                if (item.data.error) {
+                    card.style.borderColor = '#F44336';
+                    card.innerHTML = `<span class="card-symbol">${item.symbol}</span><div style="color:#F44336; font-size:0.8rem; margin-top:8px">Data Unavailable</div>`;
+                } else {
+                    card.onclick = () => showDetails(item.symbol, item.name, item.data);
+                    
+                    // Calc change
+                    const h = item.data.history;
+                    const change = h.length > 1 ? ((h[0].price - h[1].price) / h[1].price * 100) : 0;
+                    const color = change >= 0 ? '#4CAF50' : '#F44336';
+
+                    card.innerHTML = `
+                        <span class="card-symbol">${item.symbol}</span>
+                        <span class="card-name">${item.name}</span>
+                        <span class="card-price">₹${item.data.price}</span>
+                        <div style="font-size:0.8rem; margin-top:4px; color:${color}">
+                            ${change >= 0 ? '+' : ''}${change.toFixed(2)}%
+                        </div>
+                    `;
+                }
+                container.appendChild(card);
+            });
+        }
+
+        async function init() {
+            // Load all sections
+            loadGrid(STOCKS_PENNY, 'grid-penny');
+            loadGrid(STOCKS_MID, 'grid-mid');
+            loadGrid(STOCKS_LARGE, 'grid-large');
+        }
+
+        async function handleSearch() {
+            const input = document.getElementById('symbol-input');
+            let val = input.value.trim().toUpperCase();
+            if (!val) return;
+            if (!val.includes('.') && val.length < 9) val += '.NS'; // Assume NSE if short
+            
+            document.getElementById('analysis-overlay').style.display = 'flex';
+            const data = await fetchStockData(val);
+            document.getElementById('analysis-overlay').style.display = 'none';
+
+            if (data.error) {
+                alert('Could not fetch data for: ' + val);
+            } else {
+                showDetails(val, val, data);
+            }
+        }
+
+        function showDetails(symbol, name, data) {
+            const el = document.getElementById('details');
+            el.classList.remove('hidden');
+
+            document.getElementById('detail-symbol').textContent = symbol;
+            document.getElementById('detail-price').textContent = `₹${data.data ? data.data.price : data.price}`;
+
+            const history = data.history;
+            const prices = history.map(d => d.price);
+            const analysis = generateSignal(prices);
+
+            const badge = document.getElementById('signal-badge');
+            badge.textContent = analysis.signal;
+            badge.style.backgroundColor = analysis.color;
+            document.getElementById('signal-text').innerHTML = `<span style="color:${analysis.color}">Strategy:</span> ${analysis.reason}<br><span style="font-size:0.9rem; color:#888">Stop Loss: ₹${analysis.stopLoss}</span>`;
+
+            // Chart
+            const ctx = document.getElementById('stockChart').getContext('2d');
+            if (currentChart) currentChart.destroy();
+
+            const chartData = [...history].reverse();
+            currentChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.map(d => d.date.toLocaleDateString()),
+                    datasets: [{
+                        label: 'Price',
+                        data: chartData.map(d => d.price),
+                        borderColor: '#2196F3',
+                        backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display:false }, ticks: { color: '#666', maxTicksLimit: 6 } },
+                        y: { grid: { color:'#333' }, ticks: { color:'#888' } }
+                    }
+                }
+            });
+        }
+
+        function closeDetails() {
+            document.getElementById('details').classList.add('hidden');
+        }
+
+        init();
+    </script>
+</body>
+</html>
