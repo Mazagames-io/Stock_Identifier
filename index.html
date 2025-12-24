@@ -287,28 +287,65 @@
         }
 
         async function fetchStockData(symbol) {
-             const targetUrl = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=6mo&interval=1d`);
-             const url = `https://corsproxy.io/?${targetUrl}`;
-             try {
-                const res = await fetch(url);
-                if (!res.ok) throw new Error('Network');
-                const json = await res.json();
-                const result = json.chart.result[0];
-                const prices = result.indicators.quote[0].close;
-                const times = result.timestamp;
-                
-                const clean = times.map((t, i) => ({ date: new Date(t*1000), price: prices[i] }))
-                                   .filter(d => d.price).reverse();
-                
-                return { 
-                    price: result.meta.regularMarketPrice.toFixed(2), 
-                    history: clean, 
-                    error: false 
-                };
-             } catch (e) {
-                console.error(symbol, e);
-                return { error: true };
+             const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=6mo&interval=1d&events=history&includeAdjustedClose=true`;
+             
+             // Multi-proxy Fallback Strategy to beat GitHub Pages CORS blocks
+             const proxies = [
+                 // Primary: dedicated CORS proxy
+                 (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+                 // Backup 1: AllOrigins (Raw JSON)
+                 (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+             ];
+
+             for (const createProxyUrl of proxies) {
+                 try {
+                    const finalUrl = createProxyUrl(targetUrl);
+                    console.log(`Attempting fetch via: ${finalUrl}`);
+                    
+                    const res = await fetch(finalUrl);
+                    if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+                    
+                    const json = await res.json();
+                    
+                    // Validation: Yahoo JSON structure must be correct
+                    if (!json.chart || !json.chart.result || json.chart.result.length === 0) {
+                        throw new Error('Invalid Yahoo API response structure');
+                    }
+
+                    const result = json.chart.result[0];
+                    const meta = result.meta;
+                    const inputs = result.indicators.quote[0];
+                    
+                    if (!inputs || !inputs.close) throw new Error('No quote data found');
+                    
+                    const prices = inputs.close;
+                    const times = result.timestamp;
+                    
+                    // Filter out nulls (common in Yahoo data)
+                    const clean = times.reduce((acc, t, i) => {
+                        if (prices[i] !== null && prices[i] !== undefined) {
+                            acc.push({ date: new Date(t * 1000), price: prices[i] });
+                        }
+                        return acc;
+                    }, []).reverse(); // Newest first
+
+                    if (clean.length === 0) throw new Error('No valid price history');
+
+                    return { 
+                        price: (meta.regularMarketPrice || meta.chartPreviousClose || clean[0].price).toFixed(2), 
+                        history: clean, 
+                        error: false 
+                    };
+
+                 } catch (e) {
+                    console.warn(`Proxy attempt failed for ${symbol}:`, e);
+                    // Loop continues to next proxy...
+                 }
              }
+
+             // If we reach here, all proxies failed
+             console.error(`All proxies failed for ${symbol}`);
+             return { error: true, message: 'All connection attempts failed' };
         }
 
         // --- Renderers ---
