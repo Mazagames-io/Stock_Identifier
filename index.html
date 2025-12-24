@@ -135,6 +135,41 @@
             width: 40px; height: 40px; border-radius: 50%; border: 4px solid transparent; border-bottom-color: var(--accent);
         }
         @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* --- Mobile Responsive Fixes --- */
+        @media (max-width: 768px) {
+            .container { padding: 16px; }
+            
+            /* Header Stacking */
+            header { flex-direction: column; align-items: flex-start; gap: 4px; margin-bottom: 24px; }
+            .app-title { font-size: 1.3rem; }
+            
+            /* Search Box Stacking */
+            .analysis-box { padding: 20px; }
+            .search-container { flex-direction: column; width: 100%; }
+            input { width: 100%; font-size: 1rem; padding: 14px; }
+            button { width: 100%; padding: 14px; font-size: 1rem; margin-top: 8px; }
+
+            /* Grid: Force 2 columns for density, but stack if very small */
+            .grid { grid-template-columns: 1fr; gap: 12px; }
+
+            /* Details Overlay Mobile */
+            #details { padding: 0; background: var(--bg-dark); }
+            #details .container { padding: 20px; padding-top: 60px; /* Space for close btn */ }
+            
+            .header-row { flex-direction: column; gap: 16px; align-items: flex-start; border-bottom: none; }
+            .header-row > div { width: 100%; }
+            .price-tag { text-align: left !important; }
+            
+            #detail-symbol { font-size: 2.2rem !important; }
+            .price-main { font-size: 2.5rem !important; }
+            
+            .signal-box { flex-direction: column; align-items: flex-start; gap: 16px; padding: 20px; }
+            .signal-details { margin-left: 0; }
+            
+            .chart-container { height: 350px; padding: 10px; }
+            .close-btn { top: 16px; right: 16px; background: rgba(255,255,255,0.1); }
+        }
     </style>
 </head>
 <body>
